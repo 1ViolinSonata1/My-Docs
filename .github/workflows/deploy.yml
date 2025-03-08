@@ -2,8 +2,7 @@ name: Deploy VitePress site to Pages
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    branches: [master]  # 确认分支名与仓库实际主分支名一致
 
 permissions:
   contents: read
@@ -19,43 +18,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4  # 升级到最新版本
         with:
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
         with:
-          node-version: 20
-          cache: npm
+          version: 8.6.12
 
-      # 新增路径验证步骤
-      - name: Verify directory structure
+      - name: Setup Node
+        uses: actions/setup-node@v4  # 升级到 v4
+        with:
+          node-version: 20  # 推荐使用 LTS 版本
+          cache: pnpm
+
+      # 新增目录结构验证
+      - name: Verify project structure
         run: |
-          echo "Current working directory: $PWD"
+          echo "当前目录结构："
           ls -la
-          ls -la docs/.vitepress
+          echo "检查.vitepress目录："
+          ls -la .vitepress || echo "未找到.vitepress目录"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install
 
-      # 修改构建命令确保输出目录
       - name: Build with VitePress
         run: |
-          npm run docs:build
-          # 显式创建.nojekyll文件到正确位置
-          touch docs/.vitepress/dist/.nojekyll
+          pnpm run docs:build
+          # 在构建目录创建.nojekyll文件
+          touch .vitepress/dist/.nojekyll
 
       # 新增构建产物验证
       - name: Validate build output
         run: |
-          echo "Build output directory contents:"
-          ls -lR docs/.vitepress/dist
+          echo "构建产物内容："
+          ls -l .vitepress/dist
+          [ -f .vitepress/dist/index.html ] || exit 1
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v3  # 升级到最新版本
         with:
-          path: docs/.vitepress/dist  # 确保路径正确
+          path: .vitepress/dist  # 保持与构建路径一致
 
   deploy:
     environment:
@@ -63,8 +68,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     runs-on: ubuntu-latest
-    name: Deploy
+    permissions:
+      pages: write  # 显式声明部署权限
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v3  # 升级到最新版本
